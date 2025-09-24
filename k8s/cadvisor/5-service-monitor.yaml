@@ -1,0 +1,30 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadvisor
+  namespace: monitoring
+  labels:
+    component: prometheus-agent
+spec:
+  selector:
+    matchLabels:
+      name: cadvisor
+  endpoints:
+  - port: http
+    scrapeTimeout: 30s
+    metricRelabelings:
+    # Relabel cAdvisor container labels to standard Kubernetes labels
+    - sourceLabels: [container_label_io_kubernetes_pod_namespace]
+      targetLabel: namespace
+    - sourceLabels: [container_label_io_kubernetes_pod_name]
+      targetLabel: pod
+    - sourceLabels: [container_label_io_kubernetes_container_name]
+      targetLabel: container
+    # Drop metrics without proper container labels
+    - sourceLabels: [container]
+      regex: "^$"
+      action: drop
+    - sourceLabels: [container]
+      regex: "POD"
+      action: drop

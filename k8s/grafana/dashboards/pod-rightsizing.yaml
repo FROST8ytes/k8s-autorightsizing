@@ -1,0 +1,486 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-pod-rightsizing
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pod-rightsizing.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "legend": {
+              "calcs": ["mean", "max"],
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[5m])",
+              "legendFormat": "{{pod}} - Actual Usage",
+              "refId": "A"
+            },
+            {
+              "expr": "kube_pod_container_resource_requests{namespace=\"default\", resource=\"cpu\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{pod}} - CPU Request",
+              "refId": "B"
+            },
+            {
+              "expr": "kube_pod_container_resource_limits{namespace=\"default\", resource=\"cpu\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{pod}} - CPU Limit",
+              "refId": "C"
+            }
+          ],
+          "title": "CPU: Actual Usage vs Requests/Limits",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 3,
+          "options": {
+            "legend": {
+              "calcs": ["mean", "max"],
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{namespace=\"default\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{pod}} - Actual Usage",
+              "refId": "A"
+            },
+            {
+              "expr": "kube_pod_container_resource_requests{namespace=\"default\", resource=\"memory\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{pod}} - Memory Request",
+              "refId": "B"
+            },
+            {
+              "expr": "kube_pod_container_resource_limits{namespace=\"default\", resource=\"memory\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{pod}} - Memory Limit",
+              "refId": "C"
+            }
+          ],
+          "title": "Memory: Actual Usage vs Requests/Limits",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "id": 4,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "values": false,
+              "calcs": ["lastNotNull"],
+              "fields": ""
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(rate(container_cpu_usage_seconds_total{namespace=\"default\", pod=~\"cpu-intensive.*\", container=\"cpu-intensive\"}[5m]) / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"cpu-intensive.*\", container=\"cpu-intensive\", resource=\"cpu\"}) * 100",
+              "legendFormat": "CPU Intensive",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(rate(container_cpu_usage_seconds_total{namespace=\"default\", pod=~\"idle-app.*\", container=\"idle-app\"}[5m]) / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"idle-app.*\", container=\"idle-app\", resource=\"cpu\"}) * 100",
+              "legendFormat": "Idle App",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(rate(container_cpu_usage_seconds_total{namespace=\"default\", pod=~\"memory-intensive.*\", container=\"memory-intensive\"}[5m]) / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"memory-intensive.*\", container=\"memory-intensive\", resource=\"cpu\"}) * 100",
+              "legendFormat": "Memory Intensive",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(rate(container_cpu_usage_seconds_total{namespace=\"default\", pod=~\"variable-load.*\", container=\"variable-load\"}[5m]) / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"variable-load.*\", container=\"variable-load\", resource=\"cpu\"}) * 100",
+              "legendFormat": "Variable Load",
+              "refId": "D"
+            }
+          ],
+          "title": "CPU Request Utilization %",
+          "type": "gauge"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "id": 5,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "values": false,
+              "calcs": ["lastNotNull"],
+              "fields": ""
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(container_memory_working_set_bytes{namespace=\"default\", pod=~\"cpu-intensive.*\", container=\"cpu-intensive\"} / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"cpu-intensive.*\", container=\"cpu-intensive\", resource=\"memory\"}) * 100",
+              "legendFormat": "CPU Intensive",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(container_memory_working_set_bytes{namespace=\"default\", pod=~\"idle-app.*\", container=\"idle-app\"} / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"idle-app.*\", container=\"idle-app\", resource=\"memory\"}) * 100",
+              "legendFormat": "Idle App",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(container_memory_working_set_bytes{namespace=\"default\", pod=~\"memory-intensive.*\", container=\"memory-intensive\"} / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"memory-intensive.*\", container=\"memory-intensive\", resource=\"memory\"}) * 100",
+              "legendFormat": "Memory Intensive",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "uid": "Prometheus"
+              },
+              "expr": "(container_memory_working_set_bytes{namespace=\"default\", pod=~\"variable-load.*\", container=\"variable-load\"} / kube_pod_container_resource_requests{namespace=\"default\", pod=~\"variable-load.*\", container=\"variable-load\", resource=\"memory\"}) * 100",
+              "legendFormat": "Variable Load",
+              "refId": "D"
+            }
+          ],
+          "title": "Memory Request Utilization %",
+          "type": "gauge"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                }
+              },
+              "mappings": [],
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+          },
+          "id": 6,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": ["value"]
+            },
+            "pieType": "pie",
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "title": "CPU Usage Distribution by Pod",
+          "type": "piechart"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                }
+              },
+              "mappings": [],
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+          },
+          "id": 7,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": ["value"]
+            },
+            "pieType": "pie",
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "pluginVersion": "8.0.0",
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"default\", container!=\"\", container!=\"POD\"}) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Memory Usage Distribution by Pod",
+          "type": "piechart"
+        }
+      ],
+      "schemaVersion": 27,
+      "style": "dark",
+      "tags": ["kubernetes", "rightsizing", "resources"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Pod Rightsizing Analysis",
+      "uid": "pod-rightsizing",
+      "version": 1
+    }
