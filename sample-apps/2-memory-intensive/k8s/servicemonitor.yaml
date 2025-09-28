@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: memory-intensive
+  namespace: default
+  labels:
+    app: memory-intensive
+spec:
+  selector:
+    matchLabels:
+      app: memory-intensive
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

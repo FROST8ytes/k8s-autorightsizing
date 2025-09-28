@@ -1,0 +1,87 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-intensive
+  namespace: default
+  labels:
+    app: cpu-intensive
+    component: sample-app
+    rightsizing: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-intensive
+  template:
+    metadata:
+      labels:
+        app: cpu-intensive
+        component: sample-app
+        rightsizing: enabled
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: app
+        image: 471112671674.dkr.ecr.ap-southeast-1.amazonaws.com/cpu-intensive:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: INTENSITY
+          valueFrom:
+            configMapKeyRef:
+              name: cpu-intensive-config
+              key: INTENSITY
+        - name: WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: cpu-intensive-config
+              key: WORKERS
+        - name: ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: cpu-intensive-config
+              key: ENABLED
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cpu-intensive-config
+              key: PORT
+        resources:
+          requests:
+            cpu: "100m"        # ❌ DELIBERATELY UNDER-PROVISIONED
+            memory: "64Mi"     # ✅ Adequate for this app
+          limits:
+            cpu: "200m"        # ❌ WILL CAUSE THROTTLING
+            memory: "128Mi"    # ✅ Adequate
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - general

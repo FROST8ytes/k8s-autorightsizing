@@ -1,0 +1,18 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: idle-app
+  namespace: default
+  labels:
+    app: idle-app
+    component: prometheus-agent
+spec:
+  selector:
+    matchLabels:
+      app: idle-app
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

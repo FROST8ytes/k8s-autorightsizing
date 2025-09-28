@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: idle-app
+  namespace: default
+  labels:
+    app: idle-app
+    component: sample-app
+    rightsizing: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: idle-app
+  template:
+    metadata:
+      labels:
+        app: idle-app
+        component: sample-app
+        rightsizing: enabled
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: idle-app
+        image: 471112671674.dkr.ecr.ap-southeast-1.amazonaws.com/idle-app:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: SIMULATE_LOAD
+          valueFrom:
+            configMapKeyRef:
+              name: idle-app-config
+              key: SIMULATE_LOAD
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: idle-app-config
+              key: PORT
+        resources:
+          requests:
+            cpu: "500m"        # ❌ DELIBERATELY OVER-PROVISIONED (50x too much)
+            memory: "1Gi"      # ❌ DELIBERATELY OVER-PROVISIONED (30x too much)
+          limits:
+            cpu: "1000m"       # ❌ COMPLETELY UNNECESSARY
+            memory: "2Gi"      # ❌ COMPLETELY UNNECESSARY
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - general

@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: variable-load
+  namespace: default
+  labels:
+    app: variable-load
+spec:
+  selector:
+    matchLabels:
+      app: variable-load
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

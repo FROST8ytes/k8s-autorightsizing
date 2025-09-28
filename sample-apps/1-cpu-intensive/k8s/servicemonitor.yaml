@@ -1,0 +1,18 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cpu-intensive
+  namespace: default
+  labels:
+    app: cpu-intensive
+    component: prometheus-agent
+spec:
+  selector:
+    matchLabels:
+      app: cpu-intensive
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

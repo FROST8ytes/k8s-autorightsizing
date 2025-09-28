@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: variable-load
+  namespace: default
+  labels:
+    app: variable-load
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: variable-load
+  template:
+    metadata:
+      labels:
+        app: variable-load
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: variable-load
+        image: 471112671674.dkr.ecr.ap-southeast-1.amazonaws.com/variable-load:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: variable-load-config
+        resources:
+          requests:
+            # Fixed allocation for variable workload
+            # Will be under-provisioned during peaks, over-provisioned during valleys
+            memory: "128Mi"
+            cpu: "200m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3

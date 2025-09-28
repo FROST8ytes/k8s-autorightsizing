@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memory-intensive
+  namespace: default
+  labels:
+    app: memory-intensive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memory-intensive
+  template:
+    metadata:
+      labels:
+        app: memory-intensive
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: memory-intensive
+        image: 471112671674.dkr.ecr.ap-southeast-1.amazonaws.com/memory-intensive:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: memory-intensive-config
+        resources:
+          requests:
+            # Deliberately under-provisioned memory - will cause OOM under load
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"  # Will hit limit when processing large batches
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3

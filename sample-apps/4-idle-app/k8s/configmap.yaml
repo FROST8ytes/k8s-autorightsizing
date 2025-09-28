@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: idle-app-config
+  namespace: default
+  labels:
+    app: idle-app
+data:
+  # Simulate minimal processing load
+  SIMULATE_LOAD: "false"
+
+  # HTTP server port
+  PORT: "8080"

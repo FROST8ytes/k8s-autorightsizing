@@ -1,0 +1,20 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cpu-intensive-config
+  namespace: default
+  labels:
+    app: cpu-intensive
+data:
+  # Load intensity: low, medium, high
+  INTENSITY: "medium"
+
+  # Number of worker threads (adjust based on CPU allocation)
+  WORKERS: "4"
+
+  # Enable/disable workers
+  ENABLED: "true"
+
+  # HTTP server port
+  PORT: "8080"

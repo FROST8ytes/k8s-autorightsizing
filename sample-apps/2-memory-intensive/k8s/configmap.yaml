@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: memory-intensive-config
+  namespace: default
+data:
+  BATCH_SIZE: "10000"
+  PROCESSING_INTERVAL: "30"
+  ENABLED: "true"
+  KEEP_IN_MEMORY: "true"
