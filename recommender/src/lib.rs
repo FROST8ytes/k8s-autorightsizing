@@ -6,15 +6,20 @@
 pub mod lib {
     pub mod aws_region;
     pub mod cli;
-    pub mod error;
     pub mod config;
+    pub mod error;
     pub mod kubernetes;
+    pub mod prometheus;
+    pub mod tui;
 }
 
 // Re-export commonly used types at the root level for convenience
 pub use lib::aws_region::AwsRegion;
-pub use lib::cli::Cli;
+pub use lib::cli::{Cli, OutputFormat};
+pub use lib::config::Config;
 pub use lib::error::{
     AwsError, ConfigError, KubernetesError, PrometheusError, RecommenderError, Result,
 };
-pub use lib::config::Config;
+pub use lib::kubernetes::{ContainerResources, DeploymentResources, KubernetesLoader};
+pub use lib::prometheus::{PrometheusClient, PrometheusData, PrometheusResponse, PrometheusResult};
+pub use lib::tui::{ResourceData, display_table};

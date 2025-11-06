@@ -31,6 +31,19 @@ pub struct Cli {
     /// Namespace to scan workloads for rightsizing
     #[arg(long)]
     pub namespace: Option<String>,
+
+    /// Output format: table (default) or json
+    #[arg(long, value_name = "FORMAT", default_value = "table")]
+    pub output: OutputFormat,
+}
+
+/// Output format for the recommender results
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Display results in an interactive table (TUI)
+    Table,
+    /// Output results as JSON
+    Json,
 }
 
 /// Set color and variants for help description
