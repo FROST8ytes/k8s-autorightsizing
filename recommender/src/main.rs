@@ -16,6 +16,9 @@ fn init_logger(verbose: bool) {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Install the default crypto provider for rustls
+    // I really don't understand why we need this
+    // But it was implied in the runtime error message
+    // when run without this line :P
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     let cli = Cli::parse();
