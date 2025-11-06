@@ -21,10 +21,20 @@ pub struct Cli {
     /// Enable verbose output
     #[arg(short, long)]
     pub verbose: bool,
+
+    /// Provide context name
+    ///
+    /// Use if you have multiple clusters in your kubeconfig
+    #[arg(long)]
+    pub context: Option<String>,
+
+    /// Namespace to scan workloads for rightsizing
+    #[arg(long)]
+    pub namespace: Option<String>,
 }
 
 /// Set color and variants for help description
-/// 
+///
 /// Thanks to [Praveen Perera](https://stackoverflow.com/a/76916424)
 fn get_styles() -> clap::builder::Styles {
     clap::builder::Styles::styled()

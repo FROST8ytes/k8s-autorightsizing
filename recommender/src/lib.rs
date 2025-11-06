@@ -7,6 +7,8 @@ pub mod lib {
     pub mod aws_region;
     pub mod cli;
     pub mod error;
+    pub mod config;
+    pub mod kubernetes;
 }
 
 // Re-export commonly used types at the root level for convenience
@@ -15,3 +17,4 @@ pub use lib::cli::Cli;
 pub use lib::error::{
     AwsError, ConfigError, KubernetesError, PrometheusError, RecommenderError, Result,
 };
+pub use lib::config::Config;
