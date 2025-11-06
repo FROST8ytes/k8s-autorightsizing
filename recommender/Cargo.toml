@@ -1,0 +1,20 @@
+[package]
+name = "recommender"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ammar Farhan Mohamad Rizam <ammar_22006911@utp.edu.my>"]
+
+[lib]
+name = "recommender"
+path = "src/lib.rs"
+
+[[bin]]
+name = "recommender"
+path = "src/main.rs"
+
+[dependencies]
+anstyle = "1.0.13"
+clap = { version = "4.5.51", features = ["derive"] }
+thiserror = "2.0.17"
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+url = "2.5.7"
