@@ -171,3 +171,7 @@ TODO.local.md
 *.tgz
 *.rar
 *.7z
+
+# Recommender
+recommender/target/
+!recommender/src/lib/
