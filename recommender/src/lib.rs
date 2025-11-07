@@ -9,6 +9,7 @@ pub mod lib {
     pub mod config;
     pub mod error;
     pub mod kubernetes;
+    pub mod logger;
     pub mod prometheus;
     pub mod tui;
 }
@@ -21,5 +22,6 @@ pub use lib::error::{
     AwsError, ConfigError, KubernetesError, PrometheusError, RecommenderError, Result,
 };
 pub use lib::kubernetes::{ContainerResources, DeploymentResources, KubernetesLoader};
+pub use lib::logger::init_logger;
 pub use lib::prometheus::{PrometheusClient, PrometheusData, PrometheusResponse, PrometheusResult};
 pub use lib::tui::{ResourceData, display_table};

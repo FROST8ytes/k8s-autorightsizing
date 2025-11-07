@@ -1,17 +1,8 @@
 use clap::Parser;
 use log::{debug, info};
 use recommender::{
-    Cli, Config, OutputFormat, ResourceData, Result, display_table,
-    lib::kubernetes::KubernetesLoader,
+    Cli, Config, KubernetesLoader, OutputFormat, ResourceData, Result, display_table, init_logger,
 };
-
-fn init_logger(verbose: bool) {
-    let log_level = if verbose { "debug" } else { "info" };
-
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
-        .format_timestamp_secs()
-        .init();
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,7 +14,7 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    init_logger(cli.verbose);
+    init_logger(cli.verbose, cli.quiet)?;
 
     info!("Starting Kubernetes Resource Recommender");
     debug!("AWS Managed Prometheus URL: {}", cli.amp_url);

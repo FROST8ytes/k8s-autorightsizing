@@ -22,6 +22,10 @@ pub struct Cli {
     #[arg(short, long)]
     pub verbose: bool,
 
+    /// Suppress log output to stdout/stderr (logs still written to file)
+    #[arg(short, long)]
+    pub quiet: bool,
+
     /// Provide context name
     ///
     /// Use if you have multiple clusters in your kubeconfig
