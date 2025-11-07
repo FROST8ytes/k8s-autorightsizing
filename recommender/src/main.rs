@@ -1,8 +1,8 @@
 use clap::Parser;
 use log::{debug, info};
 use recommender::{
-    Cli, Config, KubernetesLoader, OutputFormat, PrometheusClient, Recommender, ResourceData,
-    Result, display_table, init_logger,
+    Cli, Config, KubernetesLoader, OutputFormat, PrometheusClient, Recommender, RecommenderOutput,
+    Result, display_recommendations_table, init_logger,
 };
 
 #[tokio::main]
@@ -65,20 +65,27 @@ async fn main() -> Result<()> {
 
     info!("Generated {} recommendations", recommendations.len());
 
-    // Display recommendations
-    if !recommendations.is_empty() {
+    // Build unified output structure
+    let output = RecommenderOutput::new(
+        config.namespace.clone(),
+        config.lookback_hours,
+        deployments.len(),
+        config.cpu_request_percentile,
+        config.cpu_limit_percentile,
+        config.memory_request_percentile,
+        config.memory_limit_percentile,
+        config.safety_margin,
+        recommendations,
+    );
+
+    // Display output based on format
+    if !output.recommendations.is_empty() {
         match cli.output {
             OutputFormat::Table => {
-                // TODO: Create a better table view for recommendations
-                let json = serde_json::to_string_pretty(&recommendations).map_err(|e| {
-                    recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(
-                        format!("Failed to serialize JSON: {}", e),
-                    ))
-                })?;
-                println!("{}", json);
+                display_recommendations_table(output)?;
             }
             OutputFormat::Json => {
-                let json = serde_json::to_string_pretty(&recommendations).map_err(|e| {
+                let json = serde_json::to_string_pretty(&output).map_err(|e| {
                     recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(
                         format!("Failed to serialize JSON: {}", e),
                     ))
@@ -88,66 +95,6 @@ async fn main() -> Result<()> {
         }
     } else {
         info!("No recommendations generated");
-    }
-
-    // Convert deployment resources to ResourceData for display
-    let mut resource_data: Vec<ResourceData> = Vec::new();
-
-    for deployment in deployments {
-        debug!(
-            "Processing deployment: {}/{}",
-            deployment.namespace, deployment.name
-        );
-
-        for container in deployment.containers {
-            resource_data.push(ResourceData {
-                deployment: deployment.name.clone(),
-                container: container.name.clone(),
-                namespace: deployment.namespace.clone(),
-                cpu_request: container
-                    .cpu_request
-                    .unwrap_or_else(|| "not set".to_string()),
-                cpu_limit: container.cpu_limit.unwrap_or_else(|| "not set".to_string()),
-                memory_request: container
-                    .memory_request
-                    .unwrap_or_else(|| "not set".to_string()),
-                memory_limit: container
-                    .memory_limit
-                    .unwrap_or_else(|| "not set".to_string()),
-            });
-        }
-    }
-
-    // Sort by namespace, deployment, then container
-    resource_data.sort_by(|a, b| {
-        a.namespace
-            .cmp(&b.namespace)
-            .then(a.deployment.cmp(&b.deployment))
-            .then(a.container.cmp(&b.container))
-    });
-
-    info!(
-        "Found {} containers across all deployments",
-        resource_data.len()
-    );
-
-    // Display results based on output format
-    if !resource_data.is_empty() {
-        match cli.output {
-            OutputFormat::Table => {
-                display_table(resource_data)?;
-            }
-            OutputFormat::Json => {
-                let json = serde_json::to_string_pretty(&resource_data).map_err(|e| {
-                    recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(
-                        format!("Failed to serialize JSON: {}", e),
-                    ))
-                })?;
-                println!("{}", json);
-            }
-        }
-    } else {
-        info!("No containers found in deployments");
     }
 
     Ok(())

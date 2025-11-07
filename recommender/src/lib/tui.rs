@@ -10,21 +10,12 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
-use serde::Serialize;
 use std::io;
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ResourceData {
-    pub deployment: String,
-    pub container: String,
-    pub namespace: String,
-    pub cpu_request: String,
-    pub cpu_limit: String,
-    pub memory_request: String,
-    pub memory_limit: String,
-}
+use crate::lib::output::RecommenderOutput;
 
-pub fn display_table(data: Vec<ResourceData>) -> io::Result<()> {
+/// Display recommendations in an interactive table
+pub fn display_recommendations_table(output: RecommenderOutput) -> io::Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -33,7 +24,7 @@ pub fn display_table(data: Vec<ResourceData>) -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Run the app
-    let res = run_app(&mut terminal, data);
+    let res = run_recommendations_app(&mut terminal, output);
 
     // Restore terminal
     disable_raw_mode()?;
@@ -51,9 +42,9 @@ pub fn display_table(data: Vec<ResourceData>) -> io::Result<()> {
     Ok(())
 }
 
-fn run_app(
+fn run_recommendations_app(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    data: Vec<ResourceData>,
+    output: RecommenderOutput,
 ) -> io::Result<()> {
     let mut state = TableState::default();
     state.select(Some(0));
@@ -62,15 +53,15 @@ fn run_app(
         terminal.draw(|f| {
             let area = f.area();
 
-            // Create the table
+            // Create the table header
             let header_cells = [
+                "Namespace",
                 "Deployment",
                 "Container",
-                "Namespace",
-                "CPU Request",
-                "CPU Limit",
-                "Memory Request",
-                "Memory Limit",
+                "CPU Req (Current → Rec)",
+                "CPU Lim (Current → Rec)",
+                "Mem Req (Current → Rec)",
+                "Mem Lim (Current → Rec)",
             ]
             .iter()
             .map(|h| {
@@ -84,37 +75,68 @@ fn run_app(
                 .style(Style::default().bg(Color::DarkGray))
                 .height(1);
 
-            let rows = data.iter().map(|item| {
+            // Create table rows with change indicators
+            let rows = output.recommendations.iter().map(|rec| {
+                let cpu_req_change =
+                    get_change_indicator(&rec.current_cpu_request, &rec.recommended_cpu_request);
+                let cpu_lim_change =
+                    get_change_indicator(&rec.current_cpu_limit, &rec.recommended_cpu_limit);
+                let mem_req_change = get_change_indicator(
+                    &rec.current_memory_request,
+                    &rec.recommended_memory_request,
+                );
+                let mem_lim_change =
+                    get_change_indicator(&rec.current_memory_limit, &rec.recommended_memory_limit);
+
                 let cells = vec![
-                    Cell::from(item.deployment.clone()),
-                    Cell::from(item.container.clone()),
-                    Cell::from(item.namespace.clone()),
-                    Cell::from(item.cpu_request.clone()),
-                    Cell::from(item.cpu_limit.clone()),
-                    Cell::from(item.memory_request.clone()),
-                    Cell::from(item.memory_limit.clone()),
+                    Cell::from(rec.namespace.clone()),
+                    Cell::from(rec.deployment.clone()),
+                    Cell::from(rec.container.clone()),
+                    Cell::from(format!(
+                        "{} → {} {}",
+                        rec.current_cpu_request, rec.recommended_cpu_request, cpu_req_change.0
+                    ))
+                    .style(cpu_req_change.1),
+                    Cell::from(format!(
+                        "{} → {} {}",
+                        rec.current_cpu_limit, rec.recommended_cpu_limit, cpu_lim_change.0
+                    ))
+                    .style(cpu_lim_change.1),
+                    Cell::from(format!(
+                        "{} → {} {}",
+                        rec.current_memory_request,
+                        rec.recommended_memory_request,
+                        mem_req_change.0
+                    ))
+                    .style(mem_req_change.1),
+                    Cell::from(format!(
+                        "{} → {} {}",
+                        rec.current_memory_limit, rec.recommended_memory_limit, mem_lim_change.0
+                    ))
+                    .style(mem_lim_change.1),
                 ];
                 Row::new(cells).height(1)
             });
 
+            let title = format!(
+                " Resource Recommendations | Lookback: {}h | Containers: {} | Press 'q' to quit ",
+                output.metadata.lookback_hours, output.metadata.total_containers
+            );
+
             let table = Table::new(
                 rows,
                 [
-                    Constraint::Percentage(15),
+                    Constraint::Percentage(10),
                     Constraint::Percentage(15),
                     Constraint::Percentage(12),
-                    Constraint::Percentage(13),
-                    Constraint::Percentage(13),
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
+                    Constraint::Percentage(18),
+                    Constraint::Percentage(18),
+                    Constraint::Percentage(18),
+                    Constraint::Percentage(18),
                 ],
             )
             .header(header)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Container Resource Requests & Limits (Press 'q' to quit) "),
-            )
+            .block(Block::default().borders(Borders::ALL).title(title))
             .row_highlight_style(Style::default().bg(Color::DarkGray))
             .highlight_symbol(">> ");
 
@@ -129,7 +151,7 @@ fn run_app(
                     KeyCode::Down | KeyCode::Char('j') => {
                         let i = match state.selected() {
                             Some(i) => {
-                                if i >= data.len() - 1 {
+                                if i >= output.recommendations.len() - 1 {
                                     0
                                 } else {
                                     i + 1
@@ -143,7 +165,7 @@ fn run_app(
                         let i = match state.selected() {
                             Some(i) => {
                                 if i == 0 {
-                                    data.len() - 1
+                                    output.recommendations.len() - 1
                                 } else {
                                     i - 1
                                 }
@@ -157,4 +179,49 @@ fn run_app(
             }
         }
     }
+}
+
+/// Get change indicator and style based on comparison
+fn get_change_indicator(current: &str, recommended: &str) -> (&'static str, Style) {
+    if current == recommended || current == "not set" || recommended == "not set" {
+        ("⚪", Style::default().fg(Color::White))
+    } else {
+        // Parse values for comparison
+        let current_val = parse_resource_value(current);
+        let recommended_val = parse_resource_value(recommended);
+
+        if recommended_val > current_val {
+            ("🟢", Style::default().fg(Color::Green))
+        } else if recommended_val < current_val {
+            ("🔴", Style::default().fg(Color::Red))
+        } else {
+            ("⚪", Style::default().fg(Color::White))
+        }
+    }
+}
+
+/// Parse resource value to comparable number (handles m, Mi, Gi suffixes)
+fn parse_resource_value(value: &str) -> f64 {
+    if value == "not set" {
+        return 0.0;
+    }
+
+    // Handle CPU millicores (e.g., "100m")
+    if value.ends_with('m') {
+        return value.trim_end_matches('m').parse::<f64>().unwrap_or(0.0);
+    }
+
+    // Handle memory with Mi suffix
+    if value.ends_with("Mi") {
+        return value.trim_end_matches("Mi").parse::<f64>().unwrap_or(0.0);
+    }
+
+    // Handle memory with Gi suffix (convert to Mi)
+    if value.ends_with("Gi") {
+        let gi_val = value.trim_end_matches("Gi").parse::<f64>().unwrap_or(0.0);
+        return gi_val * 1024.0;
+    }
+
+    // Plain number (CPU cores, convert to millicores)
+    value.parse::<f64>().unwrap_or(0.0) * 1000.0
 }
