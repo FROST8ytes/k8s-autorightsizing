@@ -43,7 +43,7 @@ pub fn init_logger(verbose: bool, quiet: bool) -> Result<()> {
             .join("recommender.log")
     };
 
-    // Open log file
+    // Open log file for writing
     let log_file = fs::OpenOptions::new()
         .create(true)
         .append(true)

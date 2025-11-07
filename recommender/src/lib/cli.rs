@@ -39,6 +39,30 @@ pub struct Cli {
     /// Output format: table (default) or json
     #[arg(long, value_name = "FORMAT", default_value = "table")]
     pub output: OutputFormat,
+
+    /// Lookback period in hours for recommendations (default: 168 = 7 days)
+    #[arg(long, default_value = "168")]
+    pub lookback_hours: u64,
+
+    /// CPU percentile for request recommendations (default: 95)
+    #[arg(long, default_value = "95.0")]
+    pub cpu_request_percentile: f64,
+
+    /// CPU percentile for limit recommendations (default: 99)
+    #[arg(long, default_value = "99.0")]
+    pub cpu_limit_percentile: f64,
+
+    /// Memory percentile for request recommendations (default: 95)
+    #[arg(long, default_value = "95.0")]
+    pub memory_request_percentile: f64,
+
+    /// Memory percentile for limit recommendations (default: 99)
+    #[arg(long, default_value = "99.0")]
+    pub memory_limit_percentile: f64,
+
+    /// Safety margin multiplier for recommendations (default: 1.2 = 20% buffer)
+    #[arg(long, default_value = "1.2")]
+    pub safety_margin: f64,
 }
 
 /// Output format for the recommender results

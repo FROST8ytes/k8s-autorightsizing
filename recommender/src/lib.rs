@@ -11,6 +11,7 @@ pub mod lib {
     pub mod kubernetes;
     pub mod logger;
     pub mod prometheus;
+    pub mod recommender;
     pub mod tui;
 }
 
@@ -24,4 +25,5 @@ pub use lib::error::{
 pub use lib::kubernetes::{ContainerResources, DeploymentResources, KubernetesLoader};
 pub use lib::logger::init_logger;
 pub use lib::prometheus::{PrometheusClient, PrometheusData, PrometheusResponse, PrometheusResult};
+pub use lib::recommender::{Recommender, ResourceRecommendation, UsageStats};
 pub use lib::tui::{ResourceData, display_table};
