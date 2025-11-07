@@ -1,3 +1,4 @@
+use anstyle::{AnsiColor, Color, Style};
 use directories::ProjectDirs;
 use log::LevelFilter;
 use std::fs;
@@ -35,7 +36,6 @@ pub fn init_logger(verbose: bool, quiet: bool) -> Result<()> {
         })?;
         log_dir.join("recommender.log")
     } else {
-        // Fallback to current directory if ProjectDirs fails
         std::env::current_dir()
             .map_err(|e| {
                 crate::ConfigError::InvalidValue(format!("Failed to get current directory: {}", e))
@@ -43,16 +43,54 @@ pub fn init_logger(verbose: bool, quiet: bool) -> Result<()> {
             .join("recommender.log")
     };
 
-    // Open log file for writing
     let log_file = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&log_path)
         .map_err(|e| crate::ConfigError::InvalidValue(format!("Failed to open log file: {}", e)))?;
 
-    // Build logger
     let mut builder = env_logger::Builder::new();
-    builder.filter_level(log_level).format_timestamp_secs();
+    builder
+        .filter_level(log_level)
+        .format(|buf, record| {
+            use std::io::Write;
+
+            let level_style = match record.level() {
+                log::Level::Error => Style::new()
+                    .fg_color(Some(Color::Ansi(AnsiColor::Red)))
+                    .bold(),
+                log::Level::Warn => Style::new()
+                    .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+                    .bold(),
+                log::Level::Info => Style::new()
+                    .fg_color(Some(Color::Ansi(AnsiColor::Green)))
+                    .bold(),
+                log::Level::Debug => Style::new()
+                    .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+                    .bold(),
+                log::Level::Trace => Style::new()
+                    .fg_color(Some(Color::Ansi(AnsiColor::White)))
+                    .bold(),
+            };
+
+            let bracket_style = Style::new()
+                .fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)))
+                .bold();
+
+            write!(
+                buf,
+                "{}[{} {}{:5}{} {}]{} {}\n",
+                bracket_style.render(),
+                buf.timestamp(),
+                level_style.render(),
+                record.level(),
+                bracket_style.render(),
+                record.module_path().unwrap_or("unknown"),
+                bracket_style.render_reset(),
+                record.args()
+            )
+        })
+        .write_style(env_logger::WriteStyle::Always);
 
     if quiet {
         // Only write to file when quiet
