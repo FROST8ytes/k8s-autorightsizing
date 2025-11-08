@@ -15,9 +15,9 @@ spec:
       labels:
         app: memory-intensive
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+        prometheus.io/path: /metrics
     spec:
       containers:
       - name: memory-intensive
@@ -31,12 +31,11 @@ spec:
             name: memory-intensive-config
         resources:
           requests:
-            # Deliberately under-provisioned memory - will cause OOM under load
-            memory: "256Mi"
-            cpu: "100m"
+            memory: 29Mi
+            cpu: 1m
           limits:
-            memory: "512Mi"  # Will hit limit when processing large batches
-            cpu: "500m"
+            memory: 29Mi
+            cpu: 1m
         livenessProbe:
           httpGet:
             path: /health
