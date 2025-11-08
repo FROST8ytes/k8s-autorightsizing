@@ -94,8 +94,8 @@ async fn main() -> Result<()> {
 
         info!("Recommendations JSON: {}", json);
 
-        // Phase 1: Automatic apply mode
-        if cli.apply && cli.manifest_url.is_some() {
+        // Phase 1: Automatic apply mode (only for non-table output)
+        if cli.apply && cli.manifest_url.is_some() && cli.output != OutputFormat::Table {
             info!("Automatic apply mode enabled");
             apply_recommendations_automatic(
                 cli.manifest_url.unwrap(),
@@ -111,10 +111,16 @@ async fn main() -> Result<()> {
         // Display based on output format
         match cli.output {
             OutputFormat::Table => {
-                display_recommendations_table(output)?;
+                display_recommendations_table(
+                    output,
+                    cli.manifest_url,
+                    cli.git_branch,
+                    cli.git_username,
+                    cli.git_token,
+                )?;
             }
             OutputFormat::Json => {
-                println!("{}", json);
+                info!("{}", json);
 
                 // Phase 3: Interactive CLI mode for JSON output
                 if cli.apply {
@@ -156,15 +162,11 @@ async fn apply_recommendations_automatic(
     info!("Successfully created branch: {}", branch_name);
     if let Some(url) = pr_url {
         info!("Pull Request created: {}", url);
-        println!("\n✅ Pull Request created successfully!");
-        println!("🔗 {}", url);
     } else {
         warn!(
             "Changes committed to branch '{}' but PR creation was not available",
             branch_name
         );
-        println!("\n✅ Changes committed to branch: {}", branch_name);
-        println!("ℹ️  PR creation not available for this Git provider");
     }
 
     Ok(())
@@ -254,10 +256,6 @@ async fn apply_recommendations_interactive_cli(
     let updater_config = UpdaterConfig::new(url.clone(), token, None)?;
     let mut updater = ManifestUpdater::new(updater_config)?;
 
-    println!("\n⏳ Cloning repository...");
-    println!("⏳ Applying recommendations...");
-    println!("⏳ Creating pull request...");
-
     let (branch_name, _commit_sha, pr_url) = updater
         .apply_and_create_pr(&branch, recommendations)
         .await?;
@@ -269,7 +267,7 @@ async fn apply_recommendations_interactive_cli(
         "pr_url": pr_url,
     });
 
-    println!("\n{}", serde_json::to_string_pretty(&result).unwrap());
+    info!("\n{}", serde_json::to_string_pretty(&result).unwrap());
 
     Ok(())
 }

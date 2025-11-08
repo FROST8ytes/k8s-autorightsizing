@@ -24,6 +24,7 @@ enum AppMode {
     ConfirmApply,
     InputUrl,
     InputToken,
+    InputUsername,
     InputBranch,
     Applying,
     ShowResult(String, Option<String>), // (message, pr_url)
@@ -36,6 +37,10 @@ struct AppState {
     mode: AppMode,
     input_buffer: String,
     error_message: Option<String>,
+    // Store collected values during input flow
+    collected_url: Option<Url>,
+    collected_token: Option<String>,
+    collected_username: Option<String>,
 }
 
 impl AppState {
@@ -49,12 +54,21 @@ impl AppState {
             mode: AppMode::BrowsingTable,
             input_buffer: String::new(),
             error_message: None,
+            collected_url: None,
+            collected_token: None,
+            collected_username: None,
         }
     }
 }
 
 /// Display recommendations in an interactive table
-pub fn display_recommendations_table(output: RecommenderOutput) -> io::Result<()> {
+pub fn display_recommendations_table(
+    output: RecommenderOutput,
+    manifest_url: Option<Url>,
+    git_branch: String,
+    git_username: Option<String>,
+    git_token: Option<String>,
+) -> io::Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -63,7 +77,14 @@ pub fn display_recommendations_table(output: RecommenderOutput) -> io::Result<()
     let mut terminal = Terminal::new(backend)?;
 
     // Run the app
-    let res = run_recommendations_app(&mut terminal, output, None, String::from("main"), None);
+    let res = run_recommendations_app(
+        &mut terminal,
+        output,
+        manifest_url,
+        git_branch,
+        git_username,
+        git_token,
+    );
 
     // Restore terminal
     disable_raw_mode()?;
@@ -86,6 +107,7 @@ fn run_recommendations_app(
     output: RecommenderOutput,
     manifest_url: Option<Url>,
     git_branch: String,
+    git_username: Option<String>,
     git_token: Option<String>,
 ) -> io::Result<()> {
     let total_items = output.recommendations.len();
@@ -125,6 +147,16 @@ fn run_recommendations_app(
                         area,
                         "Enter Git Token (optional)",
                         &masked,
+                        state.error_message.as_deref(),
+                    );
+                }
+                AppMode::InputUsername => {
+                    render_table(f, area, &output, &state);
+                    render_input_dialog(
+                        f,
+                        area,
+                        "Enter Git Username (optional)",
+                        &state.input_buffer,
                         state.error_message.as_deref(),
                     );
                 }
@@ -210,22 +242,13 @@ fn run_recommendations_app(
                     AppMode::ConfirmApply => {
                         match key.code {
                             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                                // Proceed to URL input or apply directly
-                                if manifest_url.is_none() {
-                                    state.mode = AppMode::InputUrl;
-                                    state.input_buffer.clear();
-                                    state.error_message = None;
-                                } else if git_token.is_none() {
-                                    state.mode = AppMode::InputToken;
-                                    state.input_buffer.clear();
-                                    state.error_message = None;
-                                } else {
-                                    // Apply directly (async operation would go here)
-                                    state.mode = AppMode::ShowResult(
-                                        "Feature requires async support in TUI".to_string(),
-                                        None,
-                                    );
-                                }
+                                // Always start with URL input, pre-filled if provided
+                                state.mode = AppMode::InputUrl;
+                                state.input_buffer = manifest_url
+                                    .as_ref()
+                                    .map(|u| u.to_string())
+                                    .unwrap_or_default();
+                                state.error_message = None;
                             }
                             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                                 state.mode = AppMode::BrowsingTable;
@@ -233,37 +256,39 @@ fn run_recommendations_app(
                             _ => {}
                         }
                     }
-                    AppMode::InputUrl | AppMode::InputToken | AppMode::InputBranch => {
-                        match key.code {
-                            KeyCode::Enter => {
-                                handle_input_submit(
-                                    &mut state,
-                                    &manifest_url,
-                                    &git_token,
-                                    &git_branch,
-                                );
-                            }
-                            KeyCode::Esc => {
-                                state.mode = AppMode::BrowsingTable;
-                                state.input_buffer.clear();
-                                state.error_message = None;
-                            }
-                            KeyCode::Char(c) => {
-                                state.input_buffer.push(c);
-                                state.error_message = None;
-                            }
-                            KeyCode::Backspace => {
-                                state.input_buffer.pop();
-                                state.error_message = None;
-                            }
-                            _ => {}
+                    AppMode::InputUrl
+                    | AppMode::InputToken
+                    | AppMode::InputUsername
+                    | AppMode::InputBranch => match key.code {
+                        KeyCode::Enter => {
+                            handle_input_submit(
+                                &mut state,
+                                &manifest_url,
+                                &git_token,
+                                &git_username,
+                                &git_branch,
+                            );
                         }
-                    }
+                        KeyCode::Esc => {
+                            state.mode = AppMode::BrowsingTable;
+                            state.input_buffer.clear();
+                            state.error_message = None;
+                        }
+                        KeyCode::Char(c) => {
+                            state.input_buffer.push(c);
+                            state.error_message = None;
+                        }
+                        KeyCode::Backspace => {
+                            state.input_buffer.pop();
+                            state.error_message = None;
+                        }
+                        _ => {}
+                    },
                     AppMode::ShowResult(_, _) => {
                         // Any key returns to browsing
                         return Ok(());
                     }
-                    AppMode::Applying => {
+                    AppMode::Applying { .. } => {
                         // No input during applying
                     }
                 }
@@ -275,16 +300,19 @@ fn run_recommendations_app(
 fn handle_input_submit(
     state: &mut AppState,
     _manifest_url: &Option<Url>,
-    _git_token: &Option<String>,
+    git_token: &Option<String>,
+    git_username: &Option<String>,
     git_branch: &str,
 ) {
     match &state.mode {
         AppMode::InputUrl => {
             // Validate URL
             match Url::parse(&state.input_buffer) {
-                Ok(_) => {
+                Ok(url) => {
+                    state.collected_url = Some(url);
                     state.mode = AppMode::InputToken;
-                    state.input_buffer.clear();
+                    // Pre-fill with existing token if provided via CLI
+                    state.input_buffer = git_token.clone().unwrap_or_default();
                     state.error_message = None;
                 }
                 Err(e) => {
@@ -293,7 +321,25 @@ fn handle_input_submit(
             }
         }
         AppMode::InputToken => {
-            // Token is optional, move to branch input
+            // Token is optional, store it
+            state.collected_token = if state.input_buffer.is_empty() {
+                None
+            } else {
+                Some(state.input_buffer.clone())
+            };
+            // Move to username input
+            state.mode = AppMode::InputUsername;
+            state.input_buffer = git_username.clone().unwrap_or_default();
+            state.error_message = None;
+        }
+        AppMode::InputUsername => {
+            // Username is optional, store it
+            state.collected_username = if state.input_buffer.is_empty() {
+                None
+            } else {
+                Some(state.input_buffer.clone())
+            };
+            // Move to branch input
             state.mode = AppMode::InputBranch;
             state.input_buffer = git_branch.to_string();
             state.error_message = None;
@@ -301,7 +347,7 @@ fn handle_input_submit(
         AppMode::InputBranch => {
             // Would trigger actual apply here
             state.mode = AppMode::ShowResult(
-                "Apply workflow requires async support. Use CLI mode (--apply) instead."
+                "Apply workflow requires async support.\n\nTo apply changes, use CLI mode:\n  --apply --manifest-url <URL> --git-token <TOKEN> [--git-username <USER>] [--git-branch <BRANCH>]"
                     .to_string(),
                 None,
             );
@@ -357,25 +403,25 @@ fn render_table(f: &mut ratatui::Frame, area: Rect, output: &RecommenderOutput, 
             Cell::from(rec.deployment.clone()),
             Cell::from(rec.container.clone()),
             Cell::from(format!(
-                "{} → {} {}",
-                rec.current_cpu_request, rec.recommended_cpu_request, cpu_req_change.0
+                "{} → {}",
+                rec.current_cpu_request, rec.recommended_cpu_request,
             ))
-            .style(cpu_req_change.1),
+            .style(cpu_req_change),
             Cell::from(format!(
-                "{} → {} {}",
-                rec.current_cpu_limit, rec.recommended_cpu_limit, cpu_lim_change.0
+                "{} → {}",
+                rec.current_cpu_limit, rec.recommended_cpu_limit,
             ))
-            .style(cpu_lim_change.1),
+            .style(cpu_lim_change),
             Cell::from(format!(
-                "{} → {} {}",
-                rec.current_memory_request, rec.recommended_memory_request, mem_req_change.0
+                "{} → {}",
+                rec.current_memory_request, rec.recommended_memory_request,
             ))
-            .style(mem_req_change.1),
+            .style(mem_req_change),
             Cell::from(format!(
-                "{} → {} {}",
-                rec.current_memory_limit, rec.recommended_memory_limit, mem_lim_change.0
+                "{} → {}",
+                rec.current_memory_limit, rec.recommended_memory_limit,
             ))
-            .style(mem_lim_change.1),
+            .style(mem_lim_change),
         ];
         Row::new(cells).height(1)
     });
@@ -492,15 +538,15 @@ fn render_progress_dialog(f: &mut ratatui::Frame, area: Rect) {
     let text = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "⏳ Cloning repository...",
+            "[*] Cloning repository...",
             Style::default().fg(Color::Yellow),
         )),
         Line::from(Span::styled(
-            "⏳ Applying recommendations...",
+            "[*] Applying recommendations...",
             Style::default().fg(Color::Yellow),
         )),
         Line::from(Span::styled(
-            "⏳ Creating pull request...",
+            "[*] Creating pull request...",
             Style::default().fg(Color::Yellow),
         )),
         Line::from(""),
@@ -580,20 +626,20 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 /// Get change indicator and style based on comparison
-fn get_change_indicator(current: &str, recommended: &str) -> (&'static str, Style) {
+fn get_change_indicator(current: &str, recommended: &str) -> Style {
     if current == recommended || current == "not set" || recommended == "not set" {
-        ("⚪", Style::default().fg(Color::White))
+        Style::default().fg(Color::White)
     } else {
         // Parse values for comparison
         let current_val = parse_resource_value(current);
         let recommended_val = parse_resource_value(recommended);
 
         if recommended_val > current_val {
-            ("🟢", Style::default().fg(Color::Green))
+            Style::default().fg(Color::Green)
         } else if recommended_val < current_val {
-            ("🔴", Style::default().fg(Color::Red))
+            Style::default().fg(Color::Red)
         } else {
-            ("⚪", Style::default().fg(Color::White))
+            Style::default().fg(Color::White)
         }
     }
 }

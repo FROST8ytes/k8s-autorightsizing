@@ -89,7 +89,7 @@ pub struct Cli {
 }
 
 /// Output format for the recommender results
-#[derive(Debug, Clone, clap::ValueEnum)]
+#[derive(Debug, Clone, PartialEq, clap::ValueEnum)]
 pub enum OutputFormat {
     /// Display results in an interactive table (TUI)
     Table,
