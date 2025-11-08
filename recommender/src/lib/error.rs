@@ -46,6 +46,18 @@ pub enum RecommenderError {
     /// Generic error with message
     #[error("{0}")]
     Other(String),
+
+    /// Git operation errors
+    #[error("Git error: {0}")]
+    Git(String),
+
+    /// YAML parsing/serialization errors
+    #[error("YAML error: {0}")]
+    Yaml(String),
+
+    /// Apply/update operation errors
+    #[error("Apply error: {0}")]
+    ApplyError(String),
 }
 
 /// AWS-specific errors
@@ -154,3 +166,15 @@ pub enum ConfigError {
 
 /// Helper type alias for Results
 pub type Result<T> = std::result::Result<T, RecommenderError>;
+
+impl From<git2::Error> for RecommenderError {
+    fn from(e: git2::Error) -> Self {
+        RecommenderError::Git(e.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for RecommenderError {
+    fn from(e: serde_yaml::Error) -> Self {
+        RecommenderError::Yaml(e.to_string())
+    }
+}

@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::lib::config::Config;
+use crate::lib::config::RecommenderConfig;
 use crate::lib::kubernetes::{ContainerResources, DeploymentResources};
 use crate::lib::prometheus::PrometheusClient;
 use log::{debug, info};
@@ -37,11 +37,11 @@ pub struct UsageStats {
 
 pub struct Recommender {
     prometheus: PrometheusClient,
-    config: Config,
+    config: RecommenderConfig,
 }
 
 impl Recommender {
-    pub fn new(prometheus: PrometheusClient, config: Config) -> Self {
+    pub fn new(prometheus: PrometheusClient, config: RecommenderConfig) -> Self {
         Self { prometheus, config }
     }
 

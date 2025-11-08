@@ -63,6 +63,24 @@ pub struct Cli {
     /// Safety margin multiplier for recommendations (default: 1.2 = 20% buffer)
     #[arg(long, default_value = "1.2")]
     pub safety_margin: f64,
+
+    /// Make changes to the manifest files
+    #[arg(long)]
+    pub apply: bool,
+
+    /// Location of the manifest files
+    #[arg(long, value_name = "URL")]
+    pub manifest_url: Option<Url>,
+
+    /// Git repository branch to use
+    /// If not specified, the default branch will be used
+    #[arg(long, default_value = "main")]
+    pub git_branch: String,
+
+    /// Git token for private repositories
+    /// If not specified, assumes public repository access
+    #[arg(long)]
+    pub git_token: Option<String>,
 }
 
 /// Output format for the recommender results

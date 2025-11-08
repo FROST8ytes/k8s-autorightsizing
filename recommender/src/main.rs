@@ -1,8 +1,8 @@
 use clap::Parser;
 use log::{debug, info};
 use recommender::{
-    Cli, Config, KubernetesLoader, OutputFormat, PrometheusClient, Recommender, RecommenderOutput,
-    Result, display_recommendations_table, init_logger,
+    Cli, KubernetesConfig, KubernetesLoader, OutputFormat, PrometheusClient, Recommender,
+    RecommenderConfig, RecommenderOutput, Result, display_recommendations_table, init_logger,
 };
 
 #[tokio::main]
@@ -22,11 +22,13 @@ async fn main() -> Result<()> {
     debug!("AWS Region: {}", cli.region);
 
     // Create unified config with all settings
-    let config = Config::new(
+    let k8s_config = KubernetesConfig::new(
         String::from(cli.amp_url.clone()),
         cli.region.to_string(),
         cli.context,
         cli.namespace,
+    );
+    let recommender_config = RecommenderConfig::new(
         cli.lookback_hours,
         cli.cpu_request_percentile,
         cli.cpu_limit_percentile,
@@ -37,7 +39,7 @@ async fn main() -> Result<()> {
 
     // Initialize Kubernetes client
     info!("Connecting to Kubernetes cluster...");
-    let k8s_loader = KubernetesLoader::new(config.clone()).await?;
+    let k8s_loader = KubernetesLoader::new(k8s_config.clone()).await?;
 
     // Get all deployments with their resource specifications
     info!("Scanning deployments for resource requests and limits...");
@@ -55,10 +57,10 @@ async fn main() -> Result<()> {
     // Generate recommendations
     debug!(
         "Generating recommendations based on {} hours of usage data...",
-        config.lookback_hours
+        recommender_config.lookback_hours
     );
 
-    let recommender = Recommender::new(prom_client, config.clone());
+    let recommender = Recommender::new(prom_client, recommender_config.clone());
     let recommendations = recommender
         .generate_recommendations(deployments.clone())
         .await?;
@@ -67,14 +69,14 @@ async fn main() -> Result<()> {
 
     // Build unified output structure
     let output = RecommenderOutput::new(
-        config.namespace.clone(),
-        config.lookback_hours,
+        k8s_config.namespace.clone(),
+        recommender_config.lookback_hours,
         deployments.len(),
-        config.cpu_request_percentile,
-        config.cpu_limit_percentile,
-        config.memory_request_percentile,
-        config.memory_limit_percentile,
-        config.safety_margin,
+        recommender_config.cpu_request_percentile,
+        recommender_config.cpu_limit_percentile,
+        recommender_config.memory_request_percentile,
+        recommender_config.memory_limit_percentile,
+        recommender_config.safety_margin,
         recommendations,
     );
 

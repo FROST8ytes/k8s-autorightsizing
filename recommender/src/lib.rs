@@ -14,12 +14,13 @@ pub mod lib {
     pub mod prometheus;
     pub mod recommender;
     pub mod tui;
+    pub mod updater;
 }
 
 // Re-export commonly used types at the root level for convenience
 pub use lib::aws_region::AwsRegion;
 pub use lib::cli::{Cli, OutputFormat};
-pub use lib::config::Config;
+pub use lib::config::{KubernetesConfig, RecommenderConfig};
 pub use lib::error::{
     AwsError, ConfigError, KubernetesError, PrometheusError, RecommenderError, Result,
 };

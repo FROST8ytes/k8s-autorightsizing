@@ -3,7 +3,7 @@ use kube::{Client, Config, config::KubeConfigOptions};
 use log::{debug, info};
 
 use crate::{
-    Config as RecommenderConfig, ConfigError::InvalidValue, KubernetesError::ApiError,
+    KubernetesConfig as RecommenderConfig, ConfigError::InvalidValue, KubernetesError::ApiError,
     KubernetesError::ConnectionFailed, Result,
 };
 
