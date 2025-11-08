@@ -20,7 +20,7 @@ pub mod lib {
 // Re-export commonly used types at the root level for convenience
 pub use lib::aws_region::AwsRegion;
 pub use lib::cli::{Cli, OutputFormat};
-pub use lib::config::{KubernetesConfig, RecommenderConfig};
+pub use lib::config::{GitProvider, KubernetesConfig, RecommenderConfig, UpdaterConfig};
 pub use lib::error::{
     AwsError, ConfigError, KubernetesError, PrometheusError, RecommenderError, Result,
 };
@@ -30,3 +30,4 @@ pub use lib::output::{OutputMetadata, PercentileConfig, RecommenderOutput};
 pub use lib::prometheus::{PrometheusClient, PrometheusData, PrometheusResponse, PrometheusResult};
 pub use lib::recommender::{Recommender, ResourceRecommendation, UsageStats};
 pub use lib::tui::display_recommendations_table;
+pub use lib::updater::ManifestUpdater;

@@ -77,6 +77,11 @@ pub struct Cli {
     #[arg(long, default_value = "main")]
     pub git_branch: String,
 
+    /// Git username for authentication
+    /// If not specified, defaults to "git"
+    #[arg(long)]
+    pub git_username: Option<String>,
+
     /// Git token for private repositories
     /// If not specified, assumes public repository access
     #[arg(long)]

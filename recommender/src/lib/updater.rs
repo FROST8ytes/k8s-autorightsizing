@@ -35,6 +35,7 @@ impl ManifestUpdater {
 
     /// Clone the repository
     pub fn clone_repo(&mut self, branch: &str) -> Result<()> {
+        info!("Cloning base branch: {}", branch);
         info!("Cloning repository: {}", self.config.git_url);
 
         let mut callbacks = RemoteCallbacks::new();
@@ -53,16 +54,37 @@ impl ManifestUpdater {
             }
             GitConnectionType::Https => {
                 let token = self.config.auth_token.clone();
-                callbacks.credentials(move |_url, username_from_url, _allowed_types| {
+                let username = self.config.auth_username.clone();
+
+                callbacks.credentials(move |url_str, username_from_url, allowed_types| {
+                    // Log for debugging (without exposing token)
+                    info!("Git credential callback invoked for URL: {}", url_str);
+                    info!("Username from URL: {:?}", username_from_url);
+                    info!("Configured username: {:?}", username);
+                    info!("Allowed credential types: {:?}", allowed_types);
+
                     if let Some(ref token) = token {
-                        // Use token as password with empty username or 'git'
-                        let username = username_from_url.unwrap_or("git");
-                        return Cred::userpass_plaintext(username, token);
+                        // Priority: 1) CLI provided username, 2) URL username, 3) default to "git"
+                        let user = username
+                            .as_ref()
+                            .map(|s| s.as_str())
+                            .or(username_from_url)
+                            .unwrap_or("git");
+                        info!("Attempting userpass authentication with username: {}", user);
+                        return Cred::userpass_plaintext(user, token);
                     }
+
+                    info!("Falling back to default credentials");
                     Cred::default()
                 });
             }
         }
+
+        // Add certificate check callback for debugging
+        callbacks.certificate_check(|_cert, _host| {
+            info!("Certificate check passed");
+            Ok(git2::CertificateCheckStatus::CertificateOk)
+        });
 
         let mut fetch_options = FetchOptions::new();
         fetch_options.remote_callbacks(callbacks);

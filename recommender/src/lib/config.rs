@@ -126,11 +126,16 @@ pub struct UpdaterConfig {
     pub git_url: Url,
     pub connection_type: GitConnectionType,
     pub auth_token: Option<String>,
+    pub auth_username: Option<String>,
     pub provider: GitProvider,
 }
 
 impl UpdaterConfig {
-    pub fn new(git_url: Url, auth_token: Option<String>) -> Result<Self> {
+    pub fn new(
+        git_url: Url,
+        auth_token: Option<String>,
+        auth_username: Option<String>,
+    ) -> Result<Self> {
         let connection_type = match git_url.scheme() {
             "ssh" => Ok(GitConnectionType::Ssh),
             "https" | "http" => Ok(GitConnectionType::Https),
@@ -145,6 +150,7 @@ impl UpdaterConfig {
             git_url,
             connection_type,
             auth_token,
+            auth_username,
             provider,
         })
     }
@@ -153,6 +159,7 @@ impl UpdaterConfig {
     pub fn with_provider(
         git_url: Url,
         auth_token: Option<String>,
+        auth_username: Option<String>,
         provider: GitProvider,
     ) -> Result<Self> {
         let connection_type = match git_url.scheme() {
@@ -167,6 +174,7 @@ impl UpdaterConfig {
             git_url,
             connection_type,
             auth_token,
+            auth_username,
             provider,
         })
     }

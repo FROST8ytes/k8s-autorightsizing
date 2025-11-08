@@ -1,9 +1,11 @@
 use clap::Parser;
-use log::{debug, info};
+use log::{debug, info, warn};
 use recommender::{
-    Cli, KubernetesConfig, KubernetesLoader, OutputFormat, PrometheusClient, Recommender,
-    RecommenderConfig, RecommenderOutput, Result, display_recommendations_table, init_logger,
+    Cli, KubernetesConfig, KubernetesLoader, ManifestUpdater, OutputFormat, PrometheusClient,
+    Recommender, RecommenderConfig, RecommenderOutput, ResourceRecommendation, Result,
+    UpdaterConfig, display_recommendations_table, init_logger,
 };
+use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -82,22 +84,192 @@ async fn main() -> Result<()> {
 
     // Display output based on format
     if !output.recommendations.is_empty() {
+        // Always output JSON for logging purposes
+        let json = serde_json::to_string_pretty(&output).map_err(|e| {
+            recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(format!(
+                "Failed to serialize JSON: {}",
+                e
+            )))
+        })?;
+
+        info!("Recommendations JSON: {}", json);
+
+        // Phase 1: Automatic apply mode
+        if cli.apply && cli.manifest_url.is_some() {
+            info!("Automatic apply mode enabled");
+            apply_recommendations_automatic(
+                cli.manifest_url.unwrap(),
+                cli.git_branch,
+                cli.git_username,
+                cli.git_token,
+                &output.recommendations,
+            )
+            .await?;
+            return Ok(());
+        }
+
+        // Display based on output format
         match cli.output {
             OutputFormat::Table => {
                 display_recommendations_table(output)?;
             }
             OutputFormat::Json => {
-                let json = serde_json::to_string_pretty(&output).map_err(|e| {
-                    recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(
-                        format!("Failed to serialize JSON: {}", e),
-                    ))
-                })?;
                 println!("{}", json);
+
+                // Phase 3: Interactive CLI mode for JSON output
+                if cli.apply {
+                    apply_recommendations_interactive_cli(
+                        cli.manifest_url,
+                        cli.git_branch,
+                        cli.git_token,
+                        &output.recommendations,
+                    )
+                    .await?;
+                }
             }
         }
     } else {
         info!("No recommendations generated");
     }
+
+    Ok(())
+}
+
+/// Apply recommendations automatically (non-interactive mode)
+async fn apply_recommendations_automatic(
+    manifest_url: url::Url,
+    git_branch: String,
+    git_username: Option<String>,
+    git_token: Option<String>,
+    recommendations: &[ResourceRecommendation],
+) -> Result<()> {
+    info!("Creating updater configuration...");
+
+    let updater_config = UpdaterConfig::new(manifest_url.clone(), git_token, git_username)?;
+    let mut updater = ManifestUpdater::new(updater_config)?;
+
+    info!("Applying recommendations and creating PR...");
+    let (branch_name, _commit_sha, pr_url) = updater
+        .apply_and_create_pr(&git_branch, recommendations)
+        .await?;
+
+    info!("Successfully created branch: {}", branch_name);
+    if let Some(url) = pr_url {
+        info!("Pull Request created: {}", url);
+        println!("\n✅ Pull Request created successfully!");
+        println!("🔗 {}", url);
+    } else {
+        warn!(
+            "Changes committed to branch '{}' but PR creation was not available",
+            branch_name
+        );
+        println!("\n✅ Changes committed to branch: {}", branch_name);
+        println!("ℹ️  PR creation not available for this Git provider");
+    }
+
+    Ok(())
+}
+
+/// Apply recommendations with interactive CLI prompts (for JSON mode)
+async fn apply_recommendations_interactive_cli(
+    manifest_url: Option<url::Url>,
+    git_branch: String,
+    git_token: Option<String>,
+    recommendations: &[ResourceRecommendation],
+) -> Result<()> {
+    // Prompt 1: Confirm apply
+    print!(
+        "\nApply changes to all {} containers? (y/n): ",
+        recommendations.len()
+    );
+    io::stdout().flush().unwrap();
+
+    let mut confirm = String::new();
+    io::stdin().read_line(&mut confirm).map_err(|e| {
+        recommender::RecommenderError::Other(format!("Failed to read input: {}", e))
+    })?;
+
+    if !confirm.trim().eq_ignore_ascii_case("y") {
+        info!("Apply cancelled by user");
+        return Ok(());
+    }
+
+    // Prompt 2: Get Git URL if not provided
+    let url = if let Some(url) = manifest_url {
+        url
+    } else {
+        print!("Enter Git repository URL: ");
+        io::stdout().flush().unwrap();
+
+        let mut url_input = String::new();
+        io::stdin().read_line(&mut url_input).map_err(|e| {
+            recommender::RecommenderError::Other(format!("Failed to read input: {}", e))
+        })?;
+
+        url::Url::parse(url_input.trim()).map_err(|e| {
+            recommender::RecommenderError::Config(recommender::ConfigError::InvalidValue(format!(
+                "Invalid URL: {}",
+                e
+            )))
+        })?
+    };
+
+    // Prompt 3: Get token if not provided
+    let token = if let Some(token) = git_token {
+        Some(token)
+    } else {
+        print!("Enter Git token (optional, press Enter for public repo): ");
+        io::stdout().flush().unwrap();
+
+        let mut token_input = String::new();
+        io::stdin().read_line(&mut token_input).map_err(|e| {
+            recommender::RecommenderError::Other(format!("Failed to read input: {}", e))
+        })?;
+
+        let trimmed = token_input.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    };
+
+    // Prompt 4: Confirm branch
+    print!("Enter branch name (default: {}): ", git_branch);
+    io::stdout().flush().unwrap();
+
+    let mut branch_input = String::new();
+    io::stdin().read_line(&mut branch_input).map_err(|e| {
+        recommender::RecommenderError::Other(format!("Failed to read input: {}", e))
+    })?;
+
+    let branch = if branch_input.trim().is_empty() {
+        git_branch
+    } else {
+        branch_input.trim().to_string()
+    };
+
+    // Execute apply
+    info!("Creating updater configuration...");
+    let updater_config = UpdaterConfig::new(url.clone(), token, None)?;
+    let mut updater = ManifestUpdater::new(updater_config)?;
+
+    println!("\n⏳ Cloning repository...");
+    println!("⏳ Applying recommendations...");
+    println!("⏳ Creating pull request...");
+
+    let (branch_name, _commit_sha, pr_url) = updater
+        .apply_and_create_pr(&branch, recommendations)
+        .await?;
+
+    // Output result as JSON
+    let result = serde_json::json!({
+        "status": "success",
+        "branch": branch_name,
+        "pr_url": pr_url,
+    });
+
+    println!("\n{}", serde_json::to_string_pretty(&result).unwrap());
 
     Ok(())
 }
