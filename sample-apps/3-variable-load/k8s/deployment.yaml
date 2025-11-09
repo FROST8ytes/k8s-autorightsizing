@@ -15,9 +15,9 @@ spec:
       labels:
         app: variable-load
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+        prometheus.io/path: /metrics
     spec:
       containers:
       - name: variable-load
@@ -31,13 +31,11 @@ spec:
             name: variable-load-config
         resources:
           requests:
-            # Fixed allocation for variable workload
-            # Will be under-provisioned during peaks, over-provisioned during valleys
-            memory: "128Mi"
-            cpu: "200m"
+            memory: 70Mi
+            cpu: 600m
           limits:
-            memory: "256Mi"
-            cpu: "500m"
+            memory: 70Mi
+            cpu: 600m
         livenessProbe:
           httpGet:
             path: /health
