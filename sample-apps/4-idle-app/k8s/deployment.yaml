@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,9 +19,9 @@ spec:
         component: sample-app
         rightsizing: enabled
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+        prometheus.io/path: /metrics
     spec:
       containers:
       - name: idle-app
@@ -45,11 +44,11 @@ spec:
               key: PORT
         resources:
           requests:
-            cpu: "500m"        # ❌ DELIBERATELY OVER-PROVISIONED (50x too much)
-            memory: "1Gi"      # ❌ DELIBERATELY OVER-PROVISIONED (30x too much)
+            cpu: 1m
+            memory: 28Mi
           limits:
-            cpu: "1000m"       # ❌ COMPLETELY UNNECESSARY
-            memory: "2Gi"      # ❌ COMPLETELY UNNECESSARY
+            cpu: 1m
+            memory: 28Mi
         livenessProbe:
           httpGet:
             path: /health

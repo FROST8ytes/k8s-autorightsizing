@@ -54,10 +54,10 @@ spec:
               key: PORT
         resources:
           requests:
-            cpu: 240m
+            cpu: 241m
             memory: 29Mi
           limits:
-            cpu: 241m
+            cpu: 300m
             memory: 29Mi
         livenessProbe:
           httpGet:
