@@ -92,7 +92,7 @@ impl Recommender {
 
         // Get time range for queries
         let end_time = SystemTime::now();
-        let start_time = end_time - Duration::from_secs(self.config.lookback_hours * 3600);
+        let start_time = end_time - Duration::from_secs_f64(self.config.lookback_hours * 3600.0);
 
         // Query CPU usage
         let cpu_query = format!(

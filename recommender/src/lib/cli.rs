@@ -40,9 +40,9 @@ pub struct Cli {
     #[arg(long, value_name = "FORMAT", default_value = "table")]
     pub output: OutputFormat,
 
-    /// Lookback period in hours for recommendations (default: 168 = 7 days)
-    #[arg(long, default_value = "168")]
-    pub lookback_hours: u64,
+    /// Lookback period in hours for recommendations (default: 168 = 7 days, supports decimals)
+    #[arg(long, default_value = "168.0")]
+    pub lookback_hours: f64,
 
     /// CPU percentile for request recommendations (default: 95)
     #[arg(long, default_value = "95.0")]

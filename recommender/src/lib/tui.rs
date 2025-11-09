@@ -9,13 +9,32 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState, Wrap},
+    widgets::{Block, Borders, Cell, Clear, Gauge, Paragraph, Row, Table, TableState, Wrap},
 };
 use std::collections::HashSet;
 use std::io;
+use std::sync::mpsc::{self, Receiver};
+use std::thread;
 use url::Url;
 
 use crate::lib::output::RecommenderOutput;
+use crate::lib::recommender::ResourceRecommendation;
+
+/// Progress update message from worker thread
+#[derive(Debug, Clone)]
+enum ProgressUpdate {
+    Stage {
+        progress: u16,
+        message: String,
+    },
+    Complete {
+        pr_url: Option<String>,
+        message: String,
+    },
+    Error {
+        message: String,
+    },
+}
 
 /// Application mode
 #[derive(Debug, Clone, PartialEq)]
@@ -26,7 +45,7 @@ enum AppMode {
     InputToken,
     InputUsername,
     InputBranch,
-    Applying,
+    Applying { progress: u16, stage: String },
     ShowResult(String, Option<String>), // (message, pr_url)
 }
 
@@ -41,6 +60,8 @@ struct AppState {
     collected_url: Option<Url>,
     collected_token: Option<String>,
     collected_username: Option<String>,
+    // Channel receiver for progress updates
+    progress_rx: Option<Receiver<ProgressUpdate>>,
 }
 
 impl AppState {
@@ -57,6 +78,7 @@ impl AppState {
             collected_url: None,
             collected_token: None,
             collected_username: None,
+            progress_rx: None,
         }
     }
 }
@@ -170,9 +192,9 @@ fn run_recommendations_app(
                         state.error_message.as_deref(),
                     );
                 }
-                AppMode::Applying => {
+                AppMode::Applying { progress, stage } => {
                     render_table(f, area, &output, &state);
-                    render_progress_dialog(f, area);
+                    render_progress_dialog(f, area, progress, &stage);
                 }
                 AppMode::ShowResult(ref message, ref pr_url) => {
                     render_table(f, area, &output, &state);
@@ -180,6 +202,28 @@ fn run_recommendations_app(
                 }
             }
         })?;
+
+        // Check for progress updates from worker thread (non-blocking)
+        if let Some(rx) = &state.progress_rx {
+            if let Ok(update) = rx.try_recv() {
+                match update {
+                    ProgressUpdate::Stage { progress, message } => {
+                        state.mode = AppMode::Applying {
+                            progress,
+                            stage: message,
+                        };
+                    }
+                    ProgressUpdate::Complete { pr_url, message } => {
+                        state.mode = AppMode::ShowResult(message, pr_url);
+                        state.progress_rx = None; // Clean up channel
+                    }
+                    ProgressUpdate::Error { message } => {
+                        state.mode = AppMode::ShowResult(message, None);
+                        state.progress_rx = None; // Clean up channel
+                    }
+                }
+            }
+        }
 
         // Handle input based on mode
         if event::poll(std::time::Duration::from_millis(100))? {
@@ -263,6 +307,7 @@ fn run_recommendations_app(
                         KeyCode::Enter => {
                             handle_input_submit(
                                 &mut state,
+                                &output,
                                 &manifest_url,
                                 &git_token,
                                 &git_username,
@@ -299,6 +344,7 @@ fn run_recommendations_app(
 
 fn handle_input_submit(
     state: &mut AppState,
+    output: &RecommenderOutput,
     _manifest_url: &Option<Url>,
     git_token: &Option<String>,
     git_username: &Option<String>,
@@ -345,15 +391,129 @@ fn handle_input_submit(
             state.error_message = None;
         }
         AppMode::InputBranch => {
-            // Would trigger actual apply here
-            state.mode = AppMode::ShowResult(
-                "Apply workflow requires async support.\n\nTo apply changes, use CLI mode:\n  --apply --manifest-url <URL> --git-token <TOKEN> [--git-username <USER>] [--git-branch <BRANCH>]"
-                    .to_string(),
-                None,
-            );
+            // All inputs collected, spawn worker thread
+            let branch = state.input_buffer.clone();
+
+            if let Some(url) = &state.collected_url {
+                // Get selected recommendations
+                let selected_recommendations: Vec<ResourceRecommendation> = state
+                    .selected_indices
+                    .iter()
+                    .filter_map(|&i| output.recommendations.get(i).cloned())
+                    .collect();
+
+                // Spawn worker thread with apply task
+                let rx = spawn_apply_worker(
+                    url.clone(),
+                    branch,
+                    state.collected_username.clone(),
+                    state.collected_token.clone(),
+                    selected_recommendations,
+                );
+
+                // Store receiver and transition to Applying mode
+                state.progress_rx = Some(rx);
+                state.mode = AppMode::Applying {
+                    progress: 0,
+                    stage: "Initializing...".to_string(),
+                };
+            }
         }
         _ => {}
     }
+}
+
+/// Spawn a worker thread that performs the apply operation
+fn spawn_apply_worker(
+    url: Url,
+    branch: String,
+    username: Option<String>,
+    token: Option<String>,
+    recommendations: Vec<ResourceRecommendation>,
+) -> Receiver<ProgressUpdate> {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        // Create tokio runtime in worker thread
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                let _ = tx.send(ProgressUpdate::Error {
+                    message: format!("Failed to create async runtime: {}", e),
+                });
+                return;
+            }
+        };
+
+        // Run async apply operation
+        rt.block_on(async {
+            use crate::lib::config::UpdaterConfig;
+            use crate::lib::updater::ManifestUpdater;
+
+            // Send initial progress
+            let _ = tx.send(ProgressUpdate::Stage {
+                progress: 10,
+                message: "Initializing updater...".to_string(),
+            });
+
+            // Create updater config
+            let config = match UpdaterConfig::new(url.clone(), token.clone(), username) {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx.send(ProgressUpdate::Error {
+                        message: format!("Failed to create updater config: {}", e),
+                    });
+                    return;
+                }
+            };
+
+            let _ = tx.send(ProgressUpdate::Stage {
+                progress: 20,
+                message: "Creating updater...".to_string(),
+            });
+
+            // Create updater
+            let mut updater = match ManifestUpdater::new(config) {
+                Ok(u) => u,
+                Err(e) => {
+                    let _ = tx.send(ProgressUpdate::Error {
+                        message: format!("Failed to create updater: {}", e),
+                    });
+                    return;
+                }
+            };
+
+            let _ = tx.send(ProgressUpdate::Stage {
+                progress: 30,
+                message: "Cloning repository...".to_string(),
+            });
+
+            // Apply and create PR
+            match updater.apply_and_create_pr(&branch, &recommendations).await {
+                Ok((new_branch, _commit_sha, pr_url)) => {
+                    let _ = tx.send(ProgressUpdate::Stage {
+                        progress: 90,
+                        message: "Finalizing...".to_string(),
+                    });
+
+                    let message = format!(
+                        "Successfully applied {} recommendation(s) to branch '{}'",
+                        recommendations.len(),
+                        new_branch
+                    );
+
+                    let _ = tx.send(ProgressUpdate::Complete { pr_url, message });
+                }
+                Err(e) => {
+                    let _ = tx.send(ProgressUpdate::Error {
+                        message: format!("Failed to apply recommendations: {}", e),
+                    });
+                }
+            }
+        });
+    });
+
+    rx
 }
 
 fn render_table(f: &mut ratatui::Frame, area: Rect, output: &RecommenderOutput, state: &AppState) {
@@ -527,41 +687,51 @@ fn render_input_dialog(
     f.render_widget(paragraph, dialog_area);
 }
 
-fn render_progress_dialog(f: &mut ratatui::Frame, area: Rect) {
-    let dialog_area = centered_rect(50, 15, area);
+fn render_progress_dialog(f: &mut ratatui::Frame, area: Rect, progress: u16, stage: &str) {
+    let dialog_area = centered_rect(60, 20, area);
 
-    let block = Block::default()
+    // Split the dialog area into sections
+    let chunks = Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Title
+            Constraint::Length(3), // Gauge
+            Constraint::Length(2), // Stage message
+            Constraint::Min(0),    // Padding
+        ])
+        .split(dialog_area);
+
+    // Clear background
+    f.render_widget(Clear, dialog_area);
+
+    // Render title block
+    let title_block = Block::default()
         .title(" Applying Changes ")
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black));
+    f.render_widget(title_block, dialog_area);
 
-    let text = vec![
+    // Render progress gauge
+    let gauge = Gauge::default()
+        .block(Block::default())
+        .gauge_style(
+            Style::default()
+                .fg(Color::Green)
+                .bg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+        )
+        .percent(progress)
+        .label(format!("{}%", progress));
+
+    f.render_widget(gauge, chunks[1]);
+
+    // Render stage message
+    let stage_text = vec![
         Line::from(""),
-        Line::from(Span::styled(
-            "[*] Cloning repository...",
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(Span::styled(
-            "[*] Applying recommendations...",
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(Span::styled(
-            "[*] Creating pull request...",
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Please wait...",
-            Style::default().fg(Color::Gray),
-        )),
+        Line::from(Span::styled(stage, Style::default().fg(Color::Yellow))),
     ];
-
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .alignment(Alignment::Center);
-
-    f.render_widget(Clear, dialog_area);
-    f.render_widget(paragraph, dialog_area);
+    let stage_paragraph = Paragraph::new(stage_text).alignment(Alignment::Center);
+    f.render_widget(stage_paragraph, chunks[2]);
 }
 
 fn render_result_dialog(f: &mut ratatui::Frame, area: Rect, message: &str, pr_url: Option<&str>) {

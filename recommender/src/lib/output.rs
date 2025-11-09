@@ -14,7 +14,7 @@ pub struct RecommenderOutput {
 pub struct OutputMetadata {
     pub timestamp: String,
     pub namespace: Option<String>,
-    pub lookback_hours: u64,
+    pub lookback_hours: f64,
     pub total_deployments: usize,
     pub total_containers: usize,
     pub percentiles_used: PercentileConfig,
@@ -34,7 +34,7 @@ impl RecommenderOutput {
     /// Create a new RecommenderOutput
     pub fn new(
         namespace: Option<String>,
-        lookback_hours: u64,
+        lookback_hours: f64,
         total_deployments: usize,
         cpu_request_percentile: f64,
         cpu_limit_percentile: f64,

@@ -28,7 +28,7 @@ impl KubernetesConfig {
 
 #[derive(Clone, Debug)]
 pub struct RecommenderConfig {
-    pub lookback_hours: u64,
+    pub lookback_hours: f64,
     pub cpu_request_percentile: f64,
     pub cpu_limit_percentile: f64,
     pub memory_request_percentile: f64,
@@ -38,7 +38,7 @@ pub struct RecommenderConfig {
 
 impl RecommenderConfig {
     pub fn new(
-        lookback_hours: u64,
+        lookback_hours: f64,
         cpu_request_percentile: f64,
         cpu_limit_percentile: f64,
         memory_request_percentile: f64,
