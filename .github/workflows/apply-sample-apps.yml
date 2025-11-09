@@ -1,0 +1,63 @@
+name: Apply Sample Apps to EKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sample-apps/**/*.yaml'
+      - 'sample-apps/**/*.yml'
+  workflow_dispatch:
+
+jobs:
+  apply-changes:
+    name: Apply Kubernetes Manifests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ secrets.EKS_CLUSTER_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+      
+      - name: Verify cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: Apply sample-apps manifests
+        run: |
+          echo "Applying changes to sample-apps..."
+          kubectl apply -f sample-apps/ --recursive
+          echo "Changes applied successfully!"
+      
+      - name: Verify deployments
+        run: |
+          echo "Checking deployment status..."
+          kubectl get deployments -n default
+          kubectl get pods -n default
+      
+      - name: Wait for rollout
+        run: |
+          echo "Waiting for deployments to roll out..."
+          kubectl rollout status deployment/cpu-intensive -n default --timeout=120s || true
+          kubectl rollout status deployment/memory-intensive -n default --timeout=120s || true
+          kubectl rollout status deployment/variable-load -n default --timeout=120s || true
+      
+      - name: Final status
+        if: always()
+        run: |
+          echo "Final deployment status:"
+          kubectl get deployments -n default -o wide
+          kubectl get pods -n default -o wide
