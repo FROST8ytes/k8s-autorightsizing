@@ -93,16 +93,6 @@ update_k8s_configs() {
     sed -i.bak "s|url: https://aps-workspaces\..*\.amazonaws\.com/workspaces/[^/]*|url: ${PROMETHEUS_ENDPOINT%/}|g" \
         k8s/grafana/3-datasources.yaml
 
-    # Update Rightsizing Engine ConfigMap with Prometheus endpoint
-    log_info "Updating Rightsizing Engine ConfigMap..."
-    sed -i.bak "s|PROMETHEUS_URL: \"PROMETHEUS_ENDPOINT_PLACEHOLDER\"|PROMETHEUS_URL: \"${PROMETHEUS_ENDPOINT%/}\"|g" \
-        rightsizing-engine/k8s/configmap.yaml
-    
-    # Update Rightsizing Engine ServiceAccount with IAM role
-    log_info "Updating Rightsizing Engine ServiceAccount..."
-    sed -i.bak "s|PROMETHEUS_ROLE_ARN_PLACEHOLDER|arn:aws:iam::${AWS_ACCOUNT_ID}:role/fyp-autorightsizing-prometheus|g" \
-        rightsizing-engine/k8s/serviceaccount.yaml
-
     # Update IAM role annotations with correct OIDC provider
     log_info "Updating IAM role annotations..."
 

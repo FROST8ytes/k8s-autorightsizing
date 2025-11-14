@@ -54,11 +54,11 @@ spec:
               key: PORT
         resources:
           requests:
-            cpu: 240m
-            memory: 29Mi
+            cpu: 100m
+            memory: 64Mi
           limits:
-            cpu: 241m
-            memory: 29Mi
+            cpu: 200m
+            memory: 128Mi
         livenessProbe:
           httpGet:
             path: /health

@@ -31,10 +31,10 @@ spec:
             name: memory-intensive-config
         resources:
           requests:
-            memory: 29Mi
+            memory: 10Mi
             cpu: 1m
           limits:
-            memory: 29Mi
+            memory: 15Mi
             cpu: 1m
         livenessProbe:
           httpGet:
