@@ -31,11 +31,11 @@ spec:
             name: memory-intensive-config
         resources:
           requests:
-            memory: 18Mi
             cpu: 1m
+            memory: 10Mi
           limits:
-            memory: 18Mi
             cpu: 1m
+            memory: 15Mi
         livenessProbe:
           httpGet:
             path: /health
