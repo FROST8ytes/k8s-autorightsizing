@@ -31,11 +31,11 @@ spec:
             name: variable-load-config
         resources:
           requests:
-            cpu: 700m
-            memory: 50Mi
+            cpu: 1m
+            memory: 1Mi
           limits:
-            cpu: 800m
-            memory: 60Mi
+            cpu: 1m
+            memory: 1Mi
         livenessProbe:
           httpGet:
             path: /health
