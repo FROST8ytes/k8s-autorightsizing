@@ -25,21 +25,21 @@ spec:
   logFormat: logfmt
   scrapeInterval: 30s
   remoteWrite:
-  # TODO: replace with your workspace
-  - url: https://aps-workspaces.ap-southeast-1.amazonaws.com/workspaces/ws-c2ada971-dbdb-4692-8ff5-1b37368f1898/api/v1/remote_write
-    sigv4:
-      region: ap-southeast-1
-    queueConfig:
-      maxSamplesPerSend: 1000
-      maxShards: 200
-      capacity: 2500
+    # TODO: replace with your workspace
+    - url: https://aps-workspaces.ap-southeast-1.amazonaws.com/workspaces/ws-991b6bb6-5c17-4af9-b73b-54404f3c3cc8/api/v1/remote_write
+      sigv4:
+        region: ap-southeast-1
+      queueConfig:
+        maxSamplesPerSend: 1000
+        maxShards: 200
+        capacity: 2500
   containers:
-  - name: prometheus
-    args:
-    - --config.file=/etc/prometheus/config_out/prometheus.env.yaml
-    - --storage.agent.path=/prometheus
-    - --enable-feature=agent
-    - --web.enable-lifecycle
+    - name: prometheus
+      args:
+        - --config.file=/etc/prometheus/config_out/prometheus.env.yaml
+        - --storage.agent.path=/prometheus
+        - --enable-feature=agent
+        - --web.enable-lifecycle
   # OPTIONAL: only if you have standalone EC2 instances to scare
   additionalScrapeConfigs:
     name: additional-scrape-configs
@@ -48,19 +48,19 @@ spec:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
-        - matchExpressions:
-          - key: role
-            operator: In
-            values:
-            - general
+          - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                  - general
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-            - key: app.kubernetes.io/name
-              operator: In
-              values:
-              - prometheus
-          topologyKey: kubernetes.io/hostname
-        weight: 100
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - prometheus
+            topologyKey: kubernetes.io/hostname
+          weight: 100
